@@ -1,7 +1,7 @@
 ﻿{
-  "Id": "DebugConsole",
-  "DisplayName": "Debug Console",
+  "Id": "AllSailsAllShipyards",
+  "DisplayName": "All Sails in All Shipyards",
   "Author": "Natorius",
   "Version": "1.0.0",
-  "EntryMethod": "DebugConsole.Main.Load"
+  "EntryMethod": "AllSailsAllShipyards.Main.Load"
 }
