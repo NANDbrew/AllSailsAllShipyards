@@ -58,6 +58,11 @@
     <Compile Include="AllSailsAllShipyards.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="info.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>set "steamdir=G:\Steam\steamapps\common\Sailwind\Mods\$(TargetName)\"
