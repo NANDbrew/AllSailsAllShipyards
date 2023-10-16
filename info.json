@@ -1,0 +1,7 @@
+﻿{
+  "Id": "DebugConsole",
+  "DisplayName": "Debug Console",
+  "Author": "Natorius",
+  "Version": "1.0.0",
+  "EntryMethod": "DebugConsole.Main.Load"
+}
