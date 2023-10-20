@@ -121,13 +121,6 @@ namespace AllSailsAllShipyards
             var sailsInCategory = Main.completeShipyardList.Where(sail => sail.GetComponent<Sail>().category == category);
             var sailsCount = sailsInCategory.Count();
 
-            //Main.logger.Log("Filtering by category: " + category.ToString());
-            //foreach (var sail in sailsInCategory)
-            //{
-            //    Main.logger.Log("> sail found: " + sail.name);
-            //}
-            //Main.logger.Log("> total sails found: " + sailsCount);
-
             // max sails per page = 12
             int pageCount;
             int remainder;
@@ -136,26 +129,15 @@ namespace AllSailsAllShipyards
             if (remainder > 0)
                 pageCount++;
 
-            //Main.logger.Log("Number of pages: " + pageCount);
-            //Main.logger.Log("(remainder was " + remainder + ")");
-
             pages = new ShipyardSailPage[pageCount];
 
             // index represents the start of a set of <= 12 sail prefabs
             for (int index = 0; index < sailsCount; index += 12)
             {
-                //Main.logger.Log("Beginning at index " + index);
                 // skip any sails already grabbed; then take the next 12 (or whatever is left < 12)
                 var pageSails = sailsInCategory.Skip(index).Take(12).ToArray();
 
-                //foreach (var sail in pageSails)
-                //{
-                //    Main.logger.Log("> sail selected for page: " + sail.name);
-                //}
-
                 var currentPage = new ShipyardSailPage(category, pageSails);
-
-                //Main.logger.Log("Placing on page number: " + (index / 12));
                 pages[index / 12] = currentPage;
             }
 
@@ -182,12 +164,12 @@ namespace AllSailsAllShipyards
             // Right button
             if (pageMod == 1)
             {
-                if (page == maxPage && darkened == false)
+                if (page == (maxPage - 1) && darkened == false)
                 {
                     this.gameObject.GetComponent<MeshRenderer>().sharedMaterial = ShipyardUI.instance.darkParchmentMaterial;
                     darkened = true;
                 }
-                else if (page < maxPage && darkened == true)
+                else if (page < (maxPage - 1) && darkened == true)
                 {
                     this.gameObject.GetComponent<MeshRenderer>().sharedMaterial = ShipyardUI.instance.parchmentMaterial;
                     darkened = false;
@@ -215,14 +197,12 @@ namespace AllSailsAllShipyards
 
             // change page and clamp
             page += pageMod;
-            if (page > maxPage)
-                page = maxPage;
+            if (page >= maxPage)
+                page = (maxPage - 1);
             if (page < 0)
                 page = 0;
 
             ShipyardUI.instance.ShowNewSailButtons(currentCategory);
-
-            Main.logger.Log("new page is " + page.ToString());
         }
     }
 
@@ -230,6 +210,7 @@ namespace AllSailsAllShipyards
     class ShipyardUIPatch
     {
         static Dictionary<SailCategory, ShipyardSailPage[]> pagesByCategory;
+        static Traverse SailMastCompatible;
 
         [HarmonyPatch("ShowUI")]
         static void Postfix(ref GameObject[] ___addSailButtons)
@@ -239,8 +220,7 @@ namespace AllSailsAllShipyards
             var rightButton = new GameObject("sail page right");
             var rightButton_MeshFilter = rightButton.AddComponent<MeshFilter>();
             rightButton_MeshFilter.sharedMesh = ___addSailButtons[0].GetComponent<MeshFilter>().sharedMesh;
-            var rightButton_MeshRenderer = rightButton.AddComponent<MeshRenderer>();
-            //rightButton_MeshRenderer.sharedMaterial = ___addSailButtons[0].GetComponent<MeshRenderer>().sharedMaterial;
+            rightButton.AddComponent<MeshRenderer>();
             rightButton.AddComponent<BoxCollider>();
             var rightButton_Script = rightButton.AddComponent<ShipyardSailPageButton>();
             rightButton_Script.pageMod = 1;
@@ -269,22 +249,19 @@ namespace AllSailsAllShipyards
             rightButtonText.transform.localRotation = Quaternion.identity;
             rightButtonText.transform.localScale = new Vector3(0.2f, 0.2f, 1f);
 
-            // --------------------------------
 
             // Initialize button for decrementing page
 
             var leftButton = new GameObject("sail page left");
             var leftButton_MeshFilter = leftButton.AddComponent<MeshFilter>();
             leftButton_MeshFilter.sharedMesh = ___addSailButtons[0].GetComponent<MeshFilter>().sharedMesh;
-            var leftButton_MeshRenderer = leftButton.AddComponent<MeshRenderer>();
-            //leftButton_MeshRenderer.sharedMaterial = ___addSailButtons[0].GetComponent<MeshRenderer>().sharedMaterial;
+            leftButton.AddComponent<MeshRenderer>();
             leftButton.AddComponent<BoxCollider>();
             var leftButton_Script = leftButton.AddComponent<ShipyardSailPageButton>();
             leftButton_Script.pageMod = -1;
 
             leftButton.transform.parent = ___addSailButtons[0].transform.parent.transform;
             leftButton.layer = 5;
-            //var anchorPosition = ___addSailButtons[0].transform.localPosition;
             leftButton.transform.localPosition = new Vector3(anchorPosition.x + 4f, anchorPosition.y - 0.85f, anchorPosition.z);
             leftButton.transform.localRotation = Quaternion.identity;
             leftButton.transform.localScale = Vector3.one * 0.8f;
@@ -306,13 +283,11 @@ namespace AllSailsAllShipyards
             leftButtonText.transform.localRotation = Quaternion.identity;
             leftButtonText.transform.localScale = new Vector3(0.2f, 0.2f, 1f);
 
-            // --------------------------------
 
             // Create pages from complete sail lists
 
             // array of pages for each category
             pagesByCategory = new Dictionary<SailCategory, ShipyardSailPage[]>(Enum.GetValues(typeof(SailCategory)).Length);
-            //Main.logger.Log("Number of categories in dict is " + pagesByCategory.Count);
 
             foreach (SailCategory category in Enum.GetValues(typeof(SailCategory)))
             {
@@ -320,15 +295,66 @@ namespace AllSailsAllShipyards
                 pagesByCategory.Add(category, pages);
             }
 
-            //Main.logger.Log("Number of pages per category:");
-            //foreach (var category in pagesByCategory.Keys)
-            //{
-            //    Main.logger.Log("-> Category " + category + " contains " + pagesByCategory[category].Length + " pages");
-            //}
 
-
+            // Bind private method for sail page rendering
+            SailMastCompatible = Traverse.Create(ShipyardUI.instance).Method("SailMastCompatible", new Type[] {typeof(GameObject)});
         }
 
-        
+        [HarmonyPatch("ShowNewSailButtons")]
+        static bool Prefix(ref SailCategory category, ref GameObject ___addSailMenu, ref GameObject[] ___addSailButtons)
+        {
+            ___addSailMenu.SetActive(true);
+
+            // Update buttons category, so it can refresh using this method when necessary
+            // TODO: review; can't I just replace this method entirely, and call one from the buttons class
+            //  which keeps track of its own current category?
+            if (ShipyardSailPageButton.currentCategory != category)
+            {
+                ShipyardSailPageButton.currentCategory = category;
+                // reset page when navigating to new category
+                ShipyardSailPageButton.page = 0;
+            }
+
+            // Get all sail pages in this category
+            var sailPages = pagesByCategory[category];
+
+            // Update buttons with max pages
+            ShipyardSailPageButton.maxPage = sailPages.Length;
+
+            // Render current page
+            //var currentPage = sailPages[ShipyardSailPageButton.page];
+            // TODO: I don't think the custom class is necessary. An array of sail game objects should suffice.
+            GameObject[] sails = { };
+            if (sailPages.Length > 0)
+                sails = sailPages[ShipyardSailPageButton.page].sails;
+
+            for (int buttonIndex = 0; buttonIndex < 12; buttonIndex++)
+            {
+                if (buttonIndex < sails.Length)
+                {
+                    ___addSailButtons[buttonIndex].SetActive(true);
+                    ___addSailButtons[buttonIndex].GetComponent<ShipyardButton>().RegisterPrefab(sails[buttonIndex]);
+
+                    bool compatible = SailMastCompatible.GetValue<bool>(sails[buttonIndex]);
+                    if (compatible)
+                    {
+                        ___addSailButtons[buttonIndex].GetComponent<Renderer>().sharedMaterial = ShipyardUI.instance.parchmentMaterial;
+                        ___addSailButtons[buttonIndex].GetComponent<Collider>().enabled = true;
+                    }
+                    else
+                    {
+                        ___addSailButtons[buttonIndex].GetComponent<Renderer>().sharedMaterial = ShipyardUI.instance.darkParchmentMaterial;
+                        ___addSailButtons[buttonIndex].GetComponent<Collider>().enabled = false;
+                    }
+                }
+                else
+                {
+                    ___addSailButtons[buttonIndex].SetActive(false);
+                }
+            }
+
+            // skip original method
+            return false;
+        }
     }
 }
