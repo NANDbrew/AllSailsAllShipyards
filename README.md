@@ -4,7 +4,7 @@ Enables the purchase and installation of any sail at any shipyard. Sails are no 
 
 ## Installation
 
-Install Unity Mod Manager according to that program's instructions. Unzip the AllSailsAllShipyards.zip file in the "Mods" folder created by UMM in your Sailwind install directory. The filepath for the .dll and .json should be "...\Sailwind\Mods\AllSailsAllShipyards\[files]".
+Install BepInEx according to that program's instructions. Unzip the AllSailsAllShipyards.zip file in the "plugins" folder created by BepInEx in your Sailwind install directory. The filepath for the .dll should be "...\Sailwind\BepInEx\plugins\AllSailsAllShipyards\[files]".
 
 ## Roadmap
 

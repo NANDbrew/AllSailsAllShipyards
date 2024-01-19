@@ -5,51 +5,34 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using UnityModManagerNet;
+//using UnityModManagerNet;
+using BepInEx;
+using BepInEx.Configuration;
+using BepInEx.Logging;
 
 namespace AllSailsAllShipyards
 {
-    public class ModSettings : UnityModManager.ModSettings, IDrawable
+    [BepInPlugin(PLUGIN_ID, PLUGIN_NAME, PLUGIN_VERSION)]
+    public class Main : BaseUnityPlugin
     {
-        public override void Save(UnityModManager.ModEntry modEntry)
-        {
-            Save(this, modEntry);
-        }
+        public const string PLUGIN_ID = "NatoriusG.AllSailsAllShipyards";
+        public const string PLUGIN_NAME = "All Sails in All Shipyards";
+        public const string PLUGIN_VERSION = "1.0.1";
 
-        public void OnChange() { }
-    }
-
-    static class Main
-    {
-        public static ModSettings settings;
-        public static UnityModManager.ModEntry.ModLogger logger;
+        //--settings--
+        //internal static ConfigEntry<int> placeholder;
         public static GameObject[] completeShipyardList;
 
-        static bool Load(UnityModManager.ModEntry modEntry)
-        {
-            var harmony = new Harmony(modEntry.Info.Id);
-            harmony.PatchAll(Assembly.GetExecutingAssembly());
+        internal static ManualLogSource logger;
 
-            settings = UnityModManager.ModSettings.Load<ModSettings>(modEntry);
-            logger = modEntry.Logger;
+        private void Awake()
+        {
+            logger = Logger;
+            Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), PLUGIN_ID);
             completeShipyardList = null;    // waiting to be filled by PrefabsDirectoryPatch
 
-            modEntry.OnGUI = OnGUI;
-            modEntry.OnSaveGUI = OnSaveGUI;
-
-            return true;
+            //placeholder = Config.Bind("Settings", "Place Holder", 1, new ConfigDescription("Description here", new AcceptableValueRange<int>(0, 5)));
         }
-
-        static void OnGUI(UnityModManager.ModEntry modEntry)
-        {
-            settings.Draw(modEntry);
-        }
-
-        static void OnSaveGUI(UnityModManager.ModEntry modEntry)
-        {
-            settings.Save(modEntry);
-        }
-
         public static string GetRegionNameFromId(int regionId)
         {
             switch (regionId)
@@ -68,16 +51,16 @@ namespace AllSailsAllShipyards
         [HarmonyPatch("Awake")]
         static void Postfix(ref int ___region, ref GameObject[] ___sailPrefabs)
         {
-            Main.logger.Log(string.Format("Patching region {0}...", Main.GetRegionNameFromId(___region)));
+            Main.logger.LogInfo(string.Format("Patching region {0}...", Main.GetRegionNameFromId(___region)));
 
             if (Main.completeShipyardList != null)
             {
                 ___sailPrefabs = Main.completeShipyardList;
-                Main.logger.Log(string.Format("Region {0} successfully patched.", Main.GetRegionNameFromId(___region)));
+                Main.logger.LogInfo(string.Format("Region {0} successfully patched.", Main.GetRegionNameFromId(___region)));
             }
             else
             {
-                Main.logger.Log("Patch failed; complete sail prefabs list is not populated!");
+                Main.logger.LogError("Patch failed; complete sail prefabs list is not populated!");
             }
         }
     }
@@ -97,7 +80,7 @@ namespace AllSailsAllShipyards
                     validSailPrefabs.Add(___sails[i]);
             }
 
-            Main.logger.Log(string.Format("Found {0} valid sail prefabs", validSailPrefabs.Count));
+            Main.logger.LogInfo(string.Format("Found {0} valid sail prefabs", validSailPrefabs.Count));
             Main.completeShipyardList = validSailPrefabs.ToArray();
         }
     }
