@@ -17,10 +17,10 @@ namespace AllSailsAllShipyards
     {
         public const string PLUGIN_ID = "NatoriusG.AllSailsAllShipyards";
         public const string PLUGIN_NAME = "All Sails in All Shipyards";
-        public const string PLUGIN_VERSION = "1.0.1";
+        public const string PLUGIN_VERSION = "1.0.2";
 
         //--settings--
-        //internal static ConfigEntry<int> placeholder;
+        //internal static ConfigEntry<bool> showObsolete;
         public static GameObject[] completeShipyardList;
 
         internal static ManualLogSource logger;
@@ -31,7 +31,7 @@ namespace AllSailsAllShipyards
             Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), PLUGIN_ID);
             completeShipyardList = null;    // waiting to be filled by PrefabsDirectoryPatch
 
-            //placeholder = Config.Bind("Settings", "Place Holder", 1, new ConfigDescription("Description here", new AcceptableValueRange<int>(0, 5)));
+            //showObsolete = Config.Bind("Settings", "Show obsolete sails", false, new ConfigDescription("Show obsolete sails in shipyard lists (reqires a reload)"));
         }
         public static string GetRegionNameFromId(int regionId)
         {
@@ -76,7 +76,7 @@ namespace AllSailsAllShipyards
             for (int i = 0; i < ___sails.Length; i++)
             {
                 // check for non-null value
-                if (___sails[i])
+                if (___sails[i] && !___sails[i].GetComponent<Sail>().obsolete)
                     validSailPrefabs.Add(___sails[i]);
             }
 
