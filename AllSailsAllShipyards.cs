@@ -69,6 +69,7 @@ namespace AllSailsAllShipyards
     class PrefabsDirectoryPatch
     {
         [HarmonyPatch("Start")]
+        [HarmonyPriority(Priority.VeryLow)]
         static void Postfix(ref GameObject[] ___sails)
         {
             var validSailPrefabs = new List<GameObject>();
