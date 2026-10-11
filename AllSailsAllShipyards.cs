@@ -17,13 +17,20 @@ namespace AllSailsAllShipyards
     {
         public const string PLUGIN_ID = "NatoriusG.AllSailsAllShipyards";
         public const string PLUGIN_NAME = "All Sails in All Shipyards";
-        public const string PLUGIN_VERSION = "1.0.2";
-
+        public const string PLUGIN_VERSION = "1.1.0";
+        internal const char separator = '|';
         //--settings--
         //internal static ConfigEntry<bool> showObsolete;
+        internal static ConfigEntry<bool> requireUnlock;
         public static GameObject[] completeShipyardList;
 
         internal static ManualLogSource logger;
+
+        public static List<GameObject> unlockedSails = new List<GameObject>();
+        public static List<int> sails = new List<int>();
+        public static List<int> visitedRegions = new List<int>();
+        public static GameObject[] localSails;
+
 
         private void Awake()
         {
@@ -32,6 +39,7 @@ namespace AllSailsAllShipyards
             completeShipyardList = null;    // waiting to be filled by PrefabsDirectoryPatch
 
             //showObsolete = Config.Bind("Settings", "Show obsolete sails", false, new ConfigDescription("Show obsolete sails in shipyard lists (reqires a reload)"));
+            requireUnlock = Config.Bind("Settings", "Sails must be unlocked", false, new ConfigDescription("Require sails to be unlocked by visiting their native shipyard"));
         }
         public static string GetRegionNameFromId(int regionId)
         {
@@ -45,15 +53,81 @@ namespace AllSailsAllShipyards
         }
     }
 
+    [HarmonyPatch(typeof(SaveLoadManager))]
+    class SaveLoadPatch
+    {
+/*        [HarmonyPatch("SaveModData")]
+        static void Prefix()
+        {
+
+        }*/
+
+        [HarmonyPatch("LoadModData")]
+        static void Postfix()
+        {
+            if (GameState.modData.TryGetValue(Main.PLUGIN_ID, out string data))
+            {
+                foreach (string s in data.Split(new char[] { Main.separator }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    int index = int.Parse(s);
+                    Main.sails.Add(index);
+                    if (index < PrefabsDirectory.instance.sails.Length && PrefabsDirectory.instance.sails[index] != null)
+                    {
+                        Main.unlockedSails.Add(PrefabsDirectory.instance.sails[index]);
+                    }
+                }
+            }
+        }
+    }
     [HarmonyPatch(typeof(Shipyard))]
     class ShipyardPatch
     {
         [HarmonyPatch("Awake")]
+        [HarmonyPriority(Priority.Last)]
         static void Postfix(ref int ___region, ref GameObject[] ___sailPrefabs)
         {
             Main.logger.LogInfo(string.Format("Patching region {0}...", Main.GetRegionNameFromId(___region)));
 
-            if (Main.completeShipyardList != null)
+            Main.localSails = ___sailPrefabs;
+
+        }
+        [HarmonyPatch("ActivateDocuments")]
+        static void Prefix(int ___region, ref GameObject[] ___sailPrefabs)
+        {
+            //if (!Main.visitedRegions.Contains(___region)/* && PlayerReputation.GetLevel(PlayerReputation.GetRep(___region)) >= 1*/)
+            //{
+
+            int freshSails = 0;
+            foreach (var sail in Main.localSails) 
+            {
+                if (sail == null) continue;
+                Sail sai = sail.GetComponent<Sail>();
+                if (!sai.obsolete)
+                {
+                    if (!Main.sails.Contains(sai.prefabIndex))
+                    {
+                        Main.sails.Add(sai.prefabIndex);
+                        freshSails++;
+                    }
+                    if (!Main.unlockedSails.Contains(sail))
+                    {
+                        Main.unlockedSails.Add(sail);
+                    }
+                }
+            }
+
+            string s = freshSails == 1 ? "" : "s";
+            if (freshSails > 0 && Main.requireUnlock.Value) 
+            {
+                NotificationUi.instance.ShowNotification($"{freshSails} new sail{s} unlocked!"); 
+            }
+            //}
+            
+            if (Main.requireUnlock.Value)
+            {
+                ___sailPrefabs = Main.unlockedSails.ToArray();
+            }
+            else if (Main.completeShipyardList != null)
             {
                 ___sailPrefabs = Main.completeShipyardList;
                 Main.logger.LogInfo(string.Format("Region {0} successfully patched.", Main.GetRegionNameFromId(___region)));
@@ -61,6 +135,17 @@ namespace AllSailsAllShipyards
             else
             {
                 Main.logger.LogError("Patch failed; complete sail prefabs list is not populated!");
+            }
+            
+            // save mod data here to avoid lag spikes on autosave
+            if (freshSails > 0)
+            {
+                string data = "";
+                foreach (var sail in Main.sails)
+                {
+                    data += sail.ToString() + Main.separator.ToString();
+                }
+                GameState.modData[Main.PLUGIN_ID] = data;
             }
         }
     }
@@ -102,7 +187,7 @@ namespace AllSailsAllShipyards
         {
             ShipyardSailPage[] pages;
             // filter for sails in the given category
-            var sailsInCategory = Main.completeShipyardList.Where(sail => sail.GetComponent<Sail>().category == category);
+            var sailsInCategory = GameState.currentShipyard.sailPrefabs.Where(sail => sail.GetComponent<Sail>().category == category);
             var sailsCount = sailsInCategory.Count();
 
             // max sails per page = 12
